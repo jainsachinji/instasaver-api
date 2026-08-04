@@ -1,44 +1,47 @@
 import os
+import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import yt_dlp
 
 app = Flask(__name__)
-CORS(app)  # CORS Enable किया गया है ताकि ब्लॉगर से कनेक्ट हो सके
+CORS(app)
 
 @app.route('/')
 def home():
-    return jsonify({"status": "running", "message": "Instagram Downloader API is active!"})
+    return jsonify({"status": "running", "message": "InstaSaver API Active"})
 
 @app.route('/download', methods=['GET'])
 def download():
     url = request.args.get('url')
     if not url:
-        return jsonify({"error": "No URL provided"}), 400
-
-    ydl_opts = {
-        'format': 'best',
-        'quiet': True,
-        'no_warnings': True,
-    }
+        return jsonify({'success': False, 'error': 'URL is required'}), 400
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            video_url = info.get('url')
-            title = info.get('title', 'Instagram Video')
-            thumbnail = info.get('thumbnail', '')
+        # RapidAPI / Third-party public API for fast reels fetching
+        api_url = f"https://api.cobalt.tools/api/json"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "url": url
+        }
+        
+        response = requests.post(api_url, json=payload, headers=headers, timeout=15)
+        data = response.json()
 
+        if response.status_code == 200 and data.get("url"):
             return jsonify({
-                "success": True,
-                "title": title,
-                "video_url": video_url,
-                "thumbnail": thumbnail
+                'success': True,
+                'title': 'Instagram Reel',
+                'video_url': data.get("url")
             })
+        else:
+            return jsonify({'success': False, 'error': 'Could not fetch video. Check link or try another reel.'}), 400
+
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-    
