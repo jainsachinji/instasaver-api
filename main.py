@@ -6,7 +6,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-RAPIDAPI_KEY = "APNI_NEW_RAPIDAPI_KEY_YAHAN_DALO"
+RAPIDAPI_KEY = "APNI_RAPIDAPI_KEY_YAHAN_DALO"
 RAPIDAPI_HOST = "instagram120.p.rapidapi.com"
 
 @app.route("/")
@@ -45,7 +45,35 @@ def download():
 
         data = res.json()
 
-        return jsonify(data)
+        if "urls" in data and len(data["urls"]) > 0:
+
+            video_url = data["urls"][0]["url"]
+            extension = data["urls"][0].get("extension", "")
+
+            if extension == "mp4":
+
+                username = ""
+                title = ""
+                picture = ""
+
+                if "meta" in data:
+                    username = data["meta"].get("username", "")
+                    title = data["meta"].get("title", "")
+
+                picture = data.get("pictureUrl", "")
+
+                return jsonify({
+                    "success": True,
+                    "video_url": video_url,
+                    "thumbnail": picture,
+                    "username": username,
+                    "title": title
+                })
+
+        return jsonify({
+            "success": False,
+            "error": "Video link not found"
+        })
 
     except Exception as e:
         return jsonify({
