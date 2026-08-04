@@ -25,41 +25,53 @@ def download():
     }
 
     try:
-        # Method 1: standard GET endpoint
-        api_url = f"https://{RAPIDAPI_HOST}/download_post"
-        res = requests.get(api_url, params={"url": url}, headers=headers, timeout=15)
+        api_url = f"https://{RAPIDAPI_HOST}/media_info"
+        res = requests.get(api_url, params={"link_or_id": url}, headers=headers, timeout=15)
         data = res.json()
 
-        video_url = extract_video_url(data)
+        video_url = None
 
-        # Method 2: POST fallback if GET doesn't return video URL
+        # Instagram Bulk Scraper API response parsing
+        if isinstance(data, dict):
+            data_field = data.get('data')
+            if isinstance(data_field, dict):
+                # Check video_versions array (Instagram official video structure)
+                video_versions = data_field.get('video_versions')
+                if isinstance(video_versions, list) and len(video_versions) > 0:
+                    video_url = video_versions[0].get('url')
+                else:
+                    video_url = data_field.get('video_url') or data_field.get('display_url')
+            elif isinstance(data_field, list) and len(data_field) > 0:
+                video_url = data_field[0].get('video_url') or data_field[0].get('url')
+
         if not video_url:
-            headers["Content-Type"] = "application/json"
-            res = requests.post(api_url, json={"url": url}, headers=headers, timeout=15)
-            data = res.json()
-            video_url = extract_video_url(data)
+            video_url = recursive_find_video(data)
 
         if video_url:
             return jsonify({'success': True, 'video_url': video_url})
         else:
-            return jsonify({'success': False, 'error': 'Video link not found', 'data': data}), 400
+            return jsonify({'success': False, 'error': 'Video link not found'}), 400
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-def extract_video_url(data):
-    if not isinstance(data, dict):
-        return None
-    
-    # Try common JSON fields where Instagram video link is returned
-    if 'data' in data:
-        d = data['data']
-        if isinstance(d, dict):
-            return d.get('video_url') or d.get('display_url') or d.get('url')
-        elif isinstance(d, list) and len(d) > 0:
-            return d[0].get('video_url') or d[0].get('url')
-            
-    return data.get('video_url') or data.get('download_url') or data.get('url')
+def recursive_find_video(data):
+    if isinstance(data, str) and data.startswith("http") and (".mp4" in data or "cdninstagram" in data or "fbcdn" in data):
+        return data
+    elif isinstance(data, dict):
+        for key in ['video_url', 'download_url', 'url']:
+            if key in data and isinstance(data[key], str) and data[key].startswith("http"):
+                return data[key]
+        for v in data.values():
+            found = recursive_find_video(v)
+            if found:
+                return found
+    elif isinstance(data, list):
+        for item in data:
+            found = recursive_find_video(item)
+            if found:
+                return found
+    return None
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
