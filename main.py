@@ -6,7 +6,8 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-RAPIDAPI_KEY = "APNI_RAPIDAPI_KEY_YAHAN_DALO"
+# आपकी सही RapidAPI Key और Host
+RAPIDAPI_KEY = "4f90533d66msh27985cd1270197dp1981b73a99"
 RAPIDAPI_HOST = "instagram120.p.rapidapi.com"
 
 @app.route("/")
@@ -21,9 +22,9 @@ def download():
         return jsonify({
             "success": False,
             "error": "URL missing"
-        })
+        }), 400
 
-    api_url = "https://instagram120.p.rapidapi.com/api/instagram/links"
+    api_url = f"https://{RAPIDAPI_HOST}/api/instagram/links"
 
     headers = {
         "Content-Type": "application/json",
@@ -44,24 +45,41 @@ def download():
         )
 
         data = res.json()
-        return jsonify(data)
 
-        if "urls" in data and len(data["urls"]) > 0:
+        # RapidAPI error handling
+        if "message" in data and "not subscribed" in data["message"].lower():
+            return jsonify({
+                "success": False,
+                "error": "RapidAPI: You are not subscribed to instagram120 API. Please subscribe on RapidAPI."
+            }), 403
 
-            video_url = data["urls"][0]["url"]
-            extension = data["urls"][0].get("extension", "")
+        # Checking API response
+        if isinstance(data, list) and len(data) > 0:
+            urls_list = data
+        elif isinstance(data, dict) and "urls" in data:
+            urls_list = data["urls"]
+        else:
+            urls_list = []
 
-            if extension == "mp4":
+        if urls_list:
+            video_url = None
+            for item in urls_list:
+                if isinstance(item, dict) and item.get("extension") == "mp4":
+                    video_url = item.get("url")
+                    break
 
+            if not video_url and isinstance(urls_list[0], dict):
+                video_url = urls_list[0].get("url")
+
+            if video_url:
                 username = ""
                 title = ""
                 picture = ""
 
-                if "meta" in data:
+                if isinstance(data, dict) and "meta" in data:
                     username = data["meta"].get("username", "")
                     title = data["meta"].get("title", "")
-
-                picture = data.get("pictureUrl", "")
+                    picture = data.get("pictureUrl", "")
 
                 return jsonify({
                     "success": True,
@@ -73,14 +91,15 @@ def download():
 
         return jsonify({
             "success": False,
-            "error": "Video link not found"
-        })
+            "error": "Video link not found in response",
+            "raw_response": data
+        }), 400
 
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e)
-        })
+        }), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
