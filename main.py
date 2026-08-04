@@ -44,6 +44,7 @@ def download():
         )
 
         data = res.json()
+        return jsonify(data)
 
         if "urls" in data and len(data["urls"]) > 0:
 
