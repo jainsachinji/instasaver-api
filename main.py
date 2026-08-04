@@ -28,6 +28,7 @@ def download():
         api_url = f"https://{RAPIDAPI_HOST}/media_info"
         res = requests.get(api_url, params={"link_or_id": url}, headers=headers, timeout=15)
         data = res.json()
+print(data)
 
         video_url = None
 
